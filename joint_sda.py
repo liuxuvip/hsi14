@@ -291,7 +291,7 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    args.layers = args.layers.split()
+    args.layers = list(map(int, args.layers.split()))
     hsi_file = args.hsi
     gnd_file = args.gt
 
