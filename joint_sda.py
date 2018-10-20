@@ -290,12 +290,13 @@ def parse_args():
     parser.add_argument('--batch_size', default=100, type=int)
     parser.add_argument('--pretraining_epochs', default=500, type=int)
     parser.add_argument('--training_epochs', default=100000, type=int)
-    parser.add_argument('--layers', nargs='+', default="280 100")
+    parser.add_argument('--layers', nargs='+', default="280 100", type=str)
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = parse_args()
-    args.layers = list(map(int, args.layers.split()))
+    if type(args.layers) == str:
+        args.layers = list(map(int, args.layers.split()))
     hsi_file = args.hsi
     gnd_file = args.gt
 

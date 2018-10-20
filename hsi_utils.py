@@ -32,8 +32,9 @@ import numpy
 import theano
 # import pylab as pl
 import matplotlib
-import matplotlib.pyplot as pl
 matplotlib.use('Agg')
+import matplotlib.pyplot as pl
+
 from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix
 
