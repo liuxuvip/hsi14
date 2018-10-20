@@ -64,9 +64,6 @@ bands = img.shape[2]
 data = sio.loadmat(gnd_file)
 gnd_img = data[args.key_gt].astype(numpy.int32)
 
-pdb.set_trace()
-
-
 # extract supervised spectral data
 datasets, _, _, _ = \
     prepare_data(hsi_img=img, gnd_img=gnd_img, merge=False,
