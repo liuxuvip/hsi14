@@ -246,7 +246,7 @@ def run_sda(datasets=None, batch_size=100,
         #                  random_state=numpy_rng.random_integers(1e10))
         [_, _], [_, _], [test_x, test_y], _ = \
         train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
-                         random_state=np.random.randint(0,1e10, dtype=np.int64))
+                         random_state=numpy.random.randint(0,1e10, dtype=numpy.int64))
         test_y = test_y + 1 # fix the label scale problem
         pred_y = pred_func(test_x)
         cm = confusion_matrix(test_y, pred_y)
