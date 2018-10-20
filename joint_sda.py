@@ -235,7 +235,7 @@ def run_sda(datasets=None, batch_size=100,
             numpy.hstack((datasets[1][1].get_value(),
                           datasets[2][1].get_value()))]
     # numpy_rng = numpy.random.RandomState(89677)
-    np.random.seed(89677)
+    numpy.random.seed(89677)
     num_test = 100
     print 'Total number of tests: %d' % num_test
     k_sae = []
