@@ -13,9 +13,10 @@ import PIL.Image
 
 from SdA import SdA
 from hsi_utils import *
+import argparse
 
-cmap = numpy.asarray( [[0, 0, 0],               
-                       [192, 192, 192],         
+cmap = numpy.asarray( [[0, 0, 0],
+                       [192, 192, 192],
                        [0, 255, 0],
                        [0, 255, 255],
                        [0, 128, 0],
@@ -25,34 +26,52 @@ cmap = numpy.asarray( [[0, 0, 0],
                        [255, 0, 0],
                        [255, 255, 0]], dtype='int32')
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Code paper 14.")
+    parser.add_argument('--hsi', default="../data 1/PaviaU/PaviaU.mat")
+    parser.add_argument('--gt', default="../data 1/PaviaU/PaviaU_gt.mat")
+    parser.add_argument('--key_hsi', default="paviaU")
+    parser.add_argument('--key_gt', default="paviaU_gt")
+    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--pretraining_epochs', default=800, type=int)
+    parser.add_argument('--training_epochs', default=250000, type=int)
+    parser.add_argument('--layers', nargs='+', default="60 60 60 60", type=str)
+    parser.add_argument('--print_every', default=1000, type=int)
+    return parser.parse_args()
+
+args = parse_args()
+if type(args.layers) == str:
+    args.layers = list(map(int, args.layers.split()))
+elif type(args.layers) == list:
+    args.layers = list(map(int, args.layers))
+
+hsi_file = args.hsi
+gnd_file = args.gt
 
 
-# load .mat files
-hsi_file = u'/home/hantek/data/hsi_data/pavia/PaviaU.mat'
-gnd_file = u'/home/hantek/data/hsi_data/pavia/PaviaU_gt.mat'
 data = sio.loadmat(hsi_file)
-img = scale_to_unit_interval(data['paviaU'].astype(theano.config.floatX))
+img = scale_to_unit_interval(data[args.key_hsi].astype(theano.config.floatX))
 width = img.shape[0]
 height = img.shape[1]
 bands = img.shape[2]
 data = sio.loadmat(gnd_file)
-gnd_img = data['paviaU_gt'].astype(numpy.int32)
+gnd_img = data[args.key_gt].astype(numpy.int32)
 
 # extract supervised spectral data
 datasets, _, _, _ = \
-    prepare_data(hsi_img=img, gnd_img=gnd_img, merge=False, 
+    prepare_data(hsi_img=img, gnd_img=gnd_img, merge=False,
                  window_size=7, n_principle=3, batch_size=100)
 
 
 ############################################################################
 # build model
 finetune_lr=0.05
-pretraining_epochs=800
+pretraining_epochs=args.pretraining_epochs
 pretrain_lr=0.5
-training_epochs=250000
-batch_size=100
-hidden_layers_sizes=[60, 60, 60, 60]
-corruption_levels = [0., 0., 0., 0.]
+training_epochs=args.training_epochs
+batch_size=args.batch_size
+hidden_layers_sizes=args.layers
+corruption_levels = [0.]*len(args.layers)
 print 'finetuning learning rate=', finetune_lr
 print 'pretraining learning rate=', pretrain_lr
 print 'pretraining epoches=', pretraining_epochs
@@ -72,7 +91,7 @@ print '... building the model'
 sda = SdA(numpy_rng=numpy_rng, n_ins=bands,
           hidden_layers_sizes=hidden_layers_sizes,
           n_outs=gnd_img.max())
-             
+
                            #########################
                            # PRETRAINING THE MODEL #
                            #########################
@@ -92,7 +111,7 @@ for i in xrange(sda.n_layers):
             c.append(pretraining_fns[i](index=batch_index,
                      corruption=corruption_levels[i],
                      lr=pretrain_lr))
-            
+
         print 'Pre-training layer %i, epoch %d, cost ' % (i, epoch),
         print numpy.mean(c)
 
@@ -162,13 +181,13 @@ print >> sys.stdout, ('The fine tuning code for file ' +
 
 ############################################################################
 filename = 'pavia_l4sda_pt%d_ft%d_lrp%.4f_f%.4f_bs%d_hid%d' % \
-           (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr, 
-            batch_size, hidden_layers_sizes[0]) 
+           (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr,
+            batch_size, hidden_layers_sizes[0])
 
 print '... getting filters'
 image = PIL.Image.fromarray(
         tile_raster_images(X=sda.dA_layers[0].W.get_value(borrow=True)[:100, :].T,
-                           img_shape=(10, 10), 
+                           img_shape=(10, 10),
                            tile_shape=(10, hidden_layers_sizes[0]/10),
                            tile_spacing=(1, 1)))
 image.save(filename + '_filters.png')
@@ -211,8 +230,8 @@ k_sae = []
 k_svm = []
 for i in xrange(num_test):
     [_, _], [_, _], [test_x, test_y], _ = \
-    train_valid_test(data, ratio=[0, 1, 1], batch_size=1, 
-                     random_state=numpy_rng.random_integers(1e10))
+    train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
+                     random_state=numpy_rng.random_integers(2**31))
     test_y = test_y + 1 # fix the label scale problem
     pred_y = pred_func(test_x)
     cm = confusion_matrix(test_y, pred_y)
@@ -245,6 +264,6 @@ if left > right:
     print 'left = %f, right = %f, test PASSED.' % (left, right)
 else:
     print 'left = %f, right = %f, test FAILED.' % (left, right)
-    
-    
-    
+
+
+

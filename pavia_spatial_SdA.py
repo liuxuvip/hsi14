@@ -19,8 +19,8 @@ import sys
 from SdA import SdA
 from hsi_utils import *
 
-cmap = numpy.asarray( [[0, 0, 0],               
-                       [192, 192, 192],         
+cmap = numpy.asarray( [[0, 0, 0],
+                       [192, 192, 192],
                        [0, 255, 0],
                        [0, 255, 255],
                        [0, 128, 0],
@@ -30,37 +30,57 @@ cmap = numpy.asarray( [[0, 0, 0],
                        [255, 0, 0],
                        [255, 255, 0]], dtype='int32')
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Code paper 14.")
+    parser.add_argument('--hsi', default="../data 1/PaviaU/PaviaU.mat")
+    parser.add_argument('--gt', default="../data 1/PaviaU/PaviaU_gt.mat")
+    parser.add_argument('--key_hsi', default="paviaU")
+    parser.add_argument('--key_gt', default="paviaU_gt")
+    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--pretraining_epochs', default=500, type=int)
+    parser.add_argument('--training_epochs', default=58000, type=int)
+    parser.add_argument('--layers', nargs='+', default="310 100 100 100 100", type=str)
+    parser.add_argument('--print_every', default=1000, type=int)
+    return parser.parse_args()
+
+args = parse_args()
+if type(args.layers) == str:
+    args.layers = list(map(int, args.layers.split()))
+elif type(args.layers) == list:
+    args.layers = list(map(int, args.layers))
+
+hsi_file = args.hsi
+gnd_file = args.gt
+
 
 # load .mat files
 print '... loanding data'
-hsi_file = u'/home/hantek/data/hsi_data/pavia/PaviaU.mat'
-gnd_file = u'/home/hantek/data/hsi_data/pavia/PaviaU_gt.mat'
 data = sio.loadmat(hsi_file)
-img = scale_to_unit_interval(data['paviaU'].astype(theano.config.floatX))
+img = scale_to_unit_interval(data[args.key_hsi].astype(theano.config.floatX))
 width = img.shape[0]
 height = img.shape[1]
 bands = img.shape[2]
 data = sio.loadmat(gnd_file)
-gnd_img = data['paviaU_gt'].astype(numpy.int32)
+gnd_img = data[args.key_gt].astype(numpy.int32)
 
 # PCA transform image, condense its spectral size.
 print '... extracting data points'
 window_size=7
 n_principle=4
 _, datasets, _, _ = \
-    prepare_data(hsi_img=img, gnd_img=gnd_img, merge=False, 
-                 window_size=window_size, n_principle=n_principle, 
+    prepare_data(hsi_img=img, gnd_img=gnd_img, merge=False,
+                 window_size=window_size, n_principle=n_principle,
                  batch_size=100)
 
 print '... training'
 # begin SdA
 pretrain_lr=0.5
-pretraining_epochs=500
+pretraining_epochs=args.pretraining_epochs
 finetune_lr=0.03
-training_epochs=58000
-batch_size=50
-hidden_layers_sizes=[310, 100, 100, 100, 100]
-corruption_levels = [0., 0., 0., 0., 0.]
+training_epochs=args.training_epochs
+batch_size=args.batch_size
+hidden_layers_sizes=args.layers
+corruption_levels = [0.]*len(args.layers)
 print 'finetuning learning rate=', finetune_lr
 print 'pretraining learning rate=', pretrain_lr
 print 'pretraining epoches=', pretraining_epochs
@@ -172,8 +192,8 @@ print ('The training code for file ' +
 
 
 filename = 'pavia_l5sda_pt%d_ft%d_lrp%.4f_f%.4f_bs%d_pca%d_ws%d' % \
-                (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr, 
-                 batch_size, n_principle, window_size) 
+                (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr,
+                 batch_size, n_principle, window_size)
 
 print '... saving parameters'
 sda.save_params(filename + '_params.pkl')
@@ -189,7 +209,7 @@ result_analysis(pred_test, true_train, true_valid, true_test)
 print '... classifying the whole image with learnt model:'
 print '...... extracting data'
 _, data_spatial, _, _ = \
-    T_pca_constructor(hsi_img=img, gnd_img=gnd_img, n_principle=n_principle, 
+    T_pca_constructor(hsi_img=img, gnd_img=gnd_img, n_principle=n_principle,
                       window_size=window_size,  flag='unsupervised')
 start_time = time.clock()
 print '...... begin '
@@ -203,7 +223,7 @@ margin = (window_size / 2) * 2  # floor it to a multiple of 2
 y_image = y_rgb.reshape(width - margin, height - margin, 3)
 scipy.misc.imsave(filename + 'wholeimg.png' , y_image)
 print 'Saving classification results'
-sio.savemat(filename + '_wholeimg.mat', 
+sio.savemat(filename + '_wholeimg.mat',
             {'y': y.reshape(width - margin, height - margin)})
 
 ############################################################################
@@ -224,7 +244,7 @@ k_sae = []
 k_svm = []
 for i in xrange(num_test):
     [_, _], [_, _], [test_x, test_y], _ = \
-    train_valid_test(data, ratio=[0, 1, 1], batch_size=1, 
+    train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
                      random_state=numpy_rng.random_integers(1e10))
     test_y = test_y + 1 # fix the label scale problem
     pred_y = pred_func(test_x)
@@ -258,5 +278,5 @@ if left > right:
     print 'left = %f, right = %f, test PASSED.' % (left, right)
 else:
     print 'left = %f, right = %f, test FAILED.' % (left, right)
-    
+
 

@@ -19,8 +19,8 @@ import sys
 from SdA import SdA
 from hsi_utils import *
 
-cmap = numpy.asarray( [[0, 0, 0],               
-                       [192, 192, 192],         
+cmap = numpy.asarray( [[0, 0, 0],
+                       [192, 192, 192],
                        [0, 255, 0],
                        [0, 255, 255],
                        [0, 128, 0],
@@ -30,16 +30,30 @@ cmap = numpy.asarray( [[0, 0, 0],
                        [255, 0, 0],
                        [255, 255, 0]], dtype='int32')
 
+import argparse
+def parse_args():
+    parser = argparse.ArgumentParser(description="Code paper 14.")
+    parser.add_argument('--hsi', default="../data 1/PaviaU/PaviaU.mat")
+    parser.add_argument('--gt', default="../data 1/PaviaU/PaviaU_gt.mat")
+    parser.add_argument('--key_hsi', default="paviaU")
+    parser.add_argument('--key_gt', default="paviaU_gt")
+    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--pretraining_epochs', default=500, type=int)
+    parser.add_argument('--training_epochs', default=80000, type=int)
+    parser.add_argument('--layers', nargs='+', default="280 100 100 100", type=str)
+    parser.add_argument('--print_every', default=1000, type=int)
+    return parser.parse_args()
+
 def run_sda(datasets=None, batch_size=100,
             window_size=7, n_principle=3,
             pretraining_epochs=2000, pretrain_lr=0.02,
-            training_epochs=10000,  finetune_lr=0.008, 
+            training_epochs=10000,  finetune_lr=0.008,
             hidden_layers_sizes=[310, 100], corruption_levels = [0., 0.]):
     """
     This function maps spatial PCs to a deep representation.
-    
+
     Parameters:
-    datasets:           A list containing 3 tuples. Each tuple have 2 entries, 
+    datasets:           A list containing 3 tuples. Each tuple have 2 entries,
                         which are theano.shared variables. They stands for train,
                         valid, test data.
     batch_size:         Batch size.
@@ -49,7 +63,7 @@ def run_sda(datasets=None, batch_size=100,
     finetune_lr:        Fine-tuning learning rate.
     hidden_layers_sizes:A list containing integers. Each intger specifies a size
                         of a hidden layer.
-    corruption_levels:  A list containing floats in the inteval [0, 1]. Each 
+    corruption_levels:  A list containing floats in the inteval [0, 1]. Each
                         number specifies the corruption level of its corresponding
                         hidden layer.
 
@@ -57,7 +71,7 @@ def run_sda(datasets=None, batch_size=100,
     spatial_rep:        2-D numpy.array. Deep representation for each spatial sample.
     test_score:         Accuracy this representations yield on the trained SdA.
     """
-    
+
     print 'finetuning learning rate=', finetune_lr
     print 'pretraining learning rate=', pretrain_lr
     print 'pretraining epoches=', pretraining_epochs
@@ -98,7 +112,7 @@ def run_sda(datasets=None, batch_size=100,
                 c.append(pretraining_fns[i](index=batch_index,
                          corruption=corruption_levels[i],
                          lr=pretrain_lr))
-            
+
             if epoch % 100 == 0:
                 print 'Pre-training layer %i, epoch %d, cost ' % (i, epoch),
                 print numpy.mean(c)
@@ -182,8 +196,8 @@ def run_sda(datasets=None, batch_size=100,
 
     # keep the following line consistent with line 227, function "prepare_data"
     filename = 'pavia_l1sda_pt%d_ft%d_lrp%.4f_f%.4f_bs%d_pca%d_ws%d' % \
-                (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr, 
-                 batch_size, n_principle, window_size) 
+                (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr,
+                 batch_size, n_principle, window_size)
 
     print '... saving parameters'
     sda.save_params(filename + '_params.pkl')
@@ -199,10 +213,10 @@ def run_sda(datasets=None, batch_size=100,
     print '... classifying the whole image with learnt model:'
     print '...... extracting data'
     data_spectral, data_spatial, _, _ = \
-        T_pca_constructor(hsi_img=img, gnd_img=gnd_img, n_principle=n_principle, 
-                          window_size=window_size, flag='unsupervised', 
+        T_pca_constructor(hsi_img=img, gnd_img=gnd_img, n_principle=n_principle,
+                          window_size=window_size, flag='unsupervised',
                           merge=True)
-    
+
     start_time = time.clock()
     print '...... begin '
     y = pred_func(data_spectral) + 1
@@ -215,9 +229,9 @@ def run_sda(datasets=None, batch_size=100,
     y_image = y_rgb.reshape(width - margin, height - margin, 3)
     scipy.misc.imsave(filename + 'wholeimg.png' , y_image)
     print 'Saving classification results'
-    sio.savemat(filename + 'wholeimg.mat', 
+    sio.savemat(filename + 'wholeimg.mat',
                 {'y': y.reshape(width - margin, height - margin)})
-    
+
     ############################################################################
     print '... performing Student\'s t-test'
     best_c = 10000.
@@ -236,7 +250,7 @@ def run_sda(datasets=None, batch_size=100,
     k_svm = []
     for i in xrange(num_test):
         [_, _], [_, _], [test_x, test_y], _ = \
-        train_valid_test(data, ratio=[0, 1, 1], batch_size=1, 
+        train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
                          random_state=numpy_rng.random_integers(1e10))
         test_y = test_y + 1 # fix the label scale problem
         pred_y = pred_func(test_x)
@@ -270,32 +284,39 @@ def run_sda(datasets=None, batch_size=100,
         print 'left = %f, right = %f, test PASSED.' % (left, right)
     else:
         print 'left = %f, right = %f, test FAILED.' % (left, right)
-    
-    
+
+
     return test_score
-    
+
 if __name__ == '__main__':
+    args = parse_args()
+    if type(args.layers) == str:
+        args.layers = list(map(int, args.layers.split()))
+    elif type(args.layers) == list:
+        args.layers = list(map(int, args.layers))
+
+    hsi_file = args.hsi
+    gnd_file = args.gt
+
     print '... loanding data'
-    hsi_file = u'/home/hantek/data/hsi_data/pavia/PaviaU.mat'
-    gnd_file = u'/home/hantek/data/hsi_data/pavia/PaviaU_gt.mat'
     data = sio.loadmat(hsi_file)
-    img = scale_to_unit_interval(data['paviaU'].astype(theano.config.floatX))
+    img = scale_to_unit_interval(data[args.key_hsi].astype(theano.config.floatX))
     width = img.shape[0]
     height = img.shape[1]
     bands = img.shape[2]
     data = sio.loadmat(gnd_file)
-    gnd_img = data['paviaU_gt'].astype(numpy.int32)
+    gnd_img = data[args.key_gt].astype(numpy.int32)
 
     print '... extracting train-valid-test sets'
     datasets, _, _, _ = \
-        prepare_data(hsi_img=img, gnd_img=gnd_img, merge=True, 
-                     window_size=7, n_principle=4, batch_size=50)
+        prepare_data(hsi_img=img, gnd_img=gnd_img, merge=True,
+                     window_size=7, n_principle=4, batch_size=args.batch_size)
 
     print '... Running hybrid feature extraction on SdA'
-    spatial_accuracy = run_sda(datasets=datasets, batch_size=50, 
+    spatial_accuracy = run_sda(datasets=datasets, batch_size=args.batch_size,
                                window_size=7, n_principle=4,
-                               pretraining_epochs=500, pretrain_lr=0.5,
-                               training_epochs=80000,  finetune_lr=0.03,
-                               hidden_layers_sizes=[280, 100, 100, 100], 
-                               corruption_levels = [0., 0., 0., 0.])
+                               pretraining_epochs=args.pretraining_epochs, pretrain_lr=0.5,
+                               training_epochs=args.training_epochs,  finetune_lr=0.03,
+                               hidden_layers_sizes=args.layers,
+                               corruption_levels = [0.]*len(args.layers))
 
