@@ -17,10 +17,11 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 from SdA import SdA
 from hsi_utils import *
+import argparse
 
-cmap = numpy.asarray( [[0, 0, 0],               
-                       [95, 205, 50],         
-                       [255, 0, 255],       
+cmap = numpy.asarray( [[0, 0, 0],
+                       [95, 205, 50],
+                       [255, 0, 255],
                        [215, 115, 0],
                        [180, 30, 0],
                        [0, 50, 0],
@@ -34,34 +35,56 @@ cmap = numpy.asarray( [[0, 0, 0],
                        [0, 0, 255]], dtype='int32')
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Code paper 14.")
+    parser.add_argument('--hsi', default="../data 1/KSC/KSC.mat")
+    parser.add_argument('--gt', default="../data 1/KSC/KSC_gt.mat")
+    parser.add_argument('--key_hsi', default="KSC")
+    parser.add_argument('--key_gt', default="KSC_gt")
+    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--pretraining_epochs', default=2000, type=int)
+    parser.add_argument('--training_epochs', default=200000, type=int)
+    parser.add_argument('--layers', nargs='+', default="310 310 310 310 310", type=str)
+    parser.add_argument('--print_every', default=1000, type=int)
+    return parser.parse_args()
+
+args = parse_args()
+if type(args.layers) == str:
+    args.layers = list(map(int, args.layers.split()))
+elif type(args.layers) == list:
+    args.layers = list(map(int, args.layers))
+
+# load .mat files
+hsi_file =args.hsi
+gnd_file = args.gt
+
+
 # load .mat files
 print '... loading data'
-hsi_file = u'/home/hantek/data/hsi_data/kennedy/KSC.mat'
-gnd_file = u'/home/hantek/data/hsi_data/kennedy/KSC_gt.mat'
 data = sio.loadmat(hsi_file)
-img = scale_to_unit_interval(data['KSC'].astype(theano.config.floatX))
+img = scale_to_unit_interval(data[args.key_hsi].astype(theano.config.floatX))
 width = img.shape[0]
 height = img.shape[1]
 bands = img.shape[2]
 data = sio.loadmat(gnd_file)
-gnd_img = data['KSC_gt']
+gnd_img = data[args.key_gt]
 gnd_img = gnd_img.astype(numpy.int32)
 
 # PCA transform image, condense its spectral size.
 print '... extracting data points'
 _, datasets, _, _ = \
-    prepare_data(hsi_img=img, gnd_img=gnd_img, merge=False, 
-                 window_size=7, n_principle=4, batch_size=100)
+    prepare_data(hsi_img=img, gnd_img=gnd_img, merge=False,
+                 window_size=7, n_principle=4, batch_size=args.batch_size)
 
 print '... training'
 # begin SdA
 finetune_lr=0.008
-pretraining_epochs=2000
+pretraining_epochs=args.pretraining_epochs
 pretrain_lr=0.02
-training_epochs=200000
-batch_size=50
-hidden_layers_sizes=[310, 310, 310, 310, 310]
-corruption_levels = [0., 0., 0., 0., 0.]
+training_epochs=args.training_epochs
+batch_size=args.batch_size
+hidden_layers_sizes=args.layers
+corruption_levels = [0.]*len(args.layers)
 print 'finetuning learning rate=', finetune_lr
 print 'pretraining learning rate=', pretrain_lr
 print 'pretraining epoches=', pretraining_epochs
@@ -102,7 +125,7 @@ for i in xrange(sda.n_layers):
             c.append(pretraining_fns[i](index=batch_index,
                      corruption=corruption_levels[i],
                      lr=pretrain_lr))
-        
+
         print 'Pre-training layer %i, epoch %d, cost ' % (i, epoch),
         print numpy.mean(c)
 
@@ -172,8 +195,8 @@ print ('The training code for file ' +
 
 
 filename = 'ksc_l1sda_pt%d_ft%d_lrp%.4f_f%.4f_bs%d_pca%d' % \
-           (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr, 
-            batch_size, 4) 
+           (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr,
+            batch_size, 4)
 
 print '... saving parameters'
 sda.save_params(filename + '_params.pkl')
@@ -190,9 +213,9 @@ print '... classifying the whole image with learnt model:'
 print '...... extracting data'
 window_size = 7
 _, data_spatial, _, _ = \
-    T_pca_constructor(hsi_img=img, gnd_img=gnd_img, n_principle=4, 
+    T_pca_constructor(hsi_img=img, gnd_img=gnd_img, n_principle=4,
                       window_size=window_size,  flag='unsupervised')
-    
+
 start_time = time.clock()
 print '...... begin '
 y = pred_func(data_spatial) + 1
@@ -205,7 +228,7 @@ y_image = y_rgb.reshape(width - margin, height - margin, 3)
 scipy.misc.imsave(filename + '_wholeimg.png' , y_image)
 
 print 'Saving classification results'
-sio.savemat(filename + 'wholeimg.mat', 
+sio.savemat(filename + 'wholeimg.mat',
             {'y': y.reshape(width - margin, height - margin)})
 
 ############################################################################
@@ -226,8 +249,8 @@ k_sae = []
 k_svm = []
 for i in xrange(num_test):
     [_, _], [_, _], [test_x, test_y], _ = \
-    train_valid_test(data, ratio=[0, 1, 1], batch_size=1, 
-                     random_state=numpy_rng.random_integers(1e10))
+    train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
+                     random_state=numpy_rng.random_integers(2**31))
     test_y = test_y + 1 # fix the label scale problem
     pred_y = pred_func(test_x)
     cm = confusion_matrix(test_y, pred_y)
