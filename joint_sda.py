@@ -41,7 +41,7 @@ def run_sda(datasets=None, batch_size=100,
             window_size=7, n_principle=4,
             pretraining_epochs=2000, pretrain_lr=0.02,
             training_epochs=10000,  finetune_lr=0.008,
-            hidden_layers_sizes=[310, 100], corruption_levels = [0., 0.]):
+            hidden_layers_sizes=[310, 100], corruption_levels = [0., 0.], print_every=100):
     """
     This function maps spatial PCs to a deep representation.
 
@@ -133,11 +133,12 @@ def run_sda(datasets=None, batch_size=100,
                             # found
     improvement_threshold = 0.995  # a relative improvement of this much is
                                    # considered significant
-    validation_frequency = min(10 * n_train_batches, patience / 2)
+    # validation_frequency = min(10 * n_train_batches, patience / 2)
                             # go through this many
                             # minibatche before checking the network
                             # on the validation set; in this case we
                             # check every epoch
+    validation_frequency = print_every
 
     best_params = None
     best_validation_loss = numpy.inf
@@ -291,6 +292,7 @@ def parse_args():
     parser.add_argument('--pretraining_epochs', default=500, type=int)
     parser.add_argument('--training_epochs', default=100000, type=int)
     parser.add_argument('--layers', nargs='+', default="280 100", type=str)
+    parser.add_argument('--print_every', default=1000, type=int)
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -323,5 +325,6 @@ if __name__ == '__main__':
                                pretraining_epochs=args.pretraining_epochs, pretrain_lr=0.5,
                                training_epochs=args.training_epochs,  finetune_lr=0.05,
                                hidden_layers_sizes=args.layers,
-                               corruption_levels = [0.]*len(args.layers))
+                               corruption_levels = [0.]*len(args.layers),
+                               print_every=args.print_every)
 
