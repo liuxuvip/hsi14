@@ -233,15 +233,19 @@ def run_sda(datasets=None, batch_size=100,
                           datasets[2][0].get_value())),
             numpy.hstack((datasets[1][1].get_value(),
                           datasets[2][1].get_value()))]
-    numpy_rng = numpy.random.RandomState(89677)
+    # numpy_rng = numpy.random.RandomState(89677)
+    np.random.seed(89677)
     num_test = 100
     print 'Total number of tests: %d' % num_test
     k_sae = []
     k_svm = []
     for i in xrange(num_test):
+        # [_, _], [_, _], [test_x, test_y], _ = \
+        # train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
+        #                  random_state=numpy_rng.random_integers(1e10))
         [_, _], [_, _], [test_x, test_y], _ = \
         train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
-                         random_state=numpy_rng.random_integers(1e10))
+                         random_state=np.random.randint(0,1e10, dtype=np.int64))
         test_y = test_y + 1 # fix the label scale problem
         pred_y = pred_func(test_x)
         cm = confusion_matrix(test_y, pred_y)
