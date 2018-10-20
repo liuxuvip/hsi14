@@ -297,6 +297,8 @@ if __name__ == '__main__':
     args = parse_args()
     if type(args.layers) == str:
         args.layers = list(map(int, args.layers.split()))
+    elif type(args.layers) == list:
+        args.layers = list(map(int, args.layers))
     hsi_file = args.hsi
     gnd_file = args.gt
 
