@@ -2,17 +2,17 @@
 #
 # Copyright (c) 2013-2015, Zhouhan LIN
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # * Redistributions of source code must retain the above copyright notice, this
 #   list of conditions and the following disclaimer.
 #
 # * Redistributions in binary form must reproduce the above copyright notice,
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -30,14 +30,17 @@ import sys
 import scipy.io as sio
 import numpy
 import theano
-import pylab as pl
+# import pylab as pl
+import matplotlib
+import matplotlib.pyplot as pl
+matplotlib.use('Agg')
 from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix
 
 # the following color map is for generating wholeimage classification figures.
-cmap = numpy.asarray( [[0, 0, 0],               
-                       [0, 205, 0],         
-                       [127, 255, 0],       
+cmap = numpy.asarray( [[0, 0, 0],
+                       [0, 205, 0],
+                       [127, 255, 0],
                        [46, 139, 87],
                        [0, 139, 0],
                        [160, 82, 45],
@@ -53,7 +56,7 @@ cmap = numpy.asarray( [[0, 0, 0],
                        [255, 127, 80]], dtype='int32')
 
 
-def result_analysis(prediction, train_truth, valid_truth, test_truth, 
+def result_analysis(prediction, train_truth, valid_truth, test_truth,
                     verbose=False):
     assert prediction.shape == test_truth.shape
     print "Detailed information in each category:"
@@ -63,23 +66,23 @@ def result_analysis(prediction, train_truth, valid_truth, test_truth,
         right_prediction = ( (test_truth-prediction) == 0 )
         right_count = numpy.sum(((test_truth==i) * right_prediction)*1)
         print "%d\t\t%d\t%d\t%d\t%d\t%f" % \
-            (i, 
-             numpy.sum((train_truth==i)*1), 
-             numpy.sum((valid_truth==i)*1), 
+            (i,
+             numpy.sum((train_truth==i)*1),
+             numpy.sum((valid_truth==i)*1),
              numpy.sum((test_truth==i)*1),
              right_count,
              right_count * 1.0 / numpy.sum((test_truth==i)*1)
             )
-    
+
     total_right_count = numpy.sum(right_prediction*1)
     print "Overall\t\t%d\t%d\t%d\t%d\t%f" % \
-            (train_truth.size, 
-             valid_truth.size, 
-             test_truth.size, 
+            (train_truth.size,
+             valid_truth.size,
+             test_truth.size,
              total_right_count,
              total_right_count * 1.0 / test_truth.size
             )
-    
+
     cm = confusion_matrix(test_truth, prediction)
     pr_a = cm.trace()*1.0 / test_truth.size
     pr_e = ((cm.sum(axis=0)*1.0/test_truth.size) * \
@@ -101,9 +104,9 @@ def result_analysis(prediction, train_truth, valid_truth, test_truth,
 
 #-------------------------------------------------------------------------------
 """
-The scale_to_unit_interval() and tile_raster_images() functions are from the 
+The scale_to_unit_interval() and tile_raster_images() functions are from the
 Deep Learning Tutorial repo:
-    
+
     https://github.com/lisa-lab/DeepLearningTutorials
 
 Below are the corresponding licence.
@@ -263,17 +266,17 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),
 def PCA_tramsform_img(img=None, n_principle=3):
     """
     This function trainsforms an HSI by 1-D PCA. PCA is fitted on the whole data
-    and is conducted on the spectral dimension, rendering the image from size 
-    length * width * dim to length * width * n_principle. 
-    
+    and is conducted on the spectral dimension, rendering the image from size
+    length * width * dim to length * width * n_principle.
+
     Parameters:
     img:                initial unregularizaed HSI.
     n_principle:        Target number of principles we want.
-    
+
     Return:
     reg_img:            Regularized, transformed image.
-    
-    WARNNING: RELATIVE ENERGY BETWEEN PRINCIPLE COMPONENTS CHANGED IN THIS 
+
+    WARNNING: RELATIVE ENERGY BETWEEN PRINCIPLE COMPONENTS CHANGED IN THIS
     IMPLEMENTATION. YOU MAY NEED TO ADD PENALTY MULTIPLIERS IN THE HIGHER NETWORKS
     TO REIMBURSE IT.
     """
@@ -281,60 +284,60 @@ def PCA_tramsform_img(img=None, n_principle=3):
     width = img.shape[1]
     dim = img.shape[2]
     # reshape img, HORIZONTALLY strench the img, without changing the spectral dim.
-    reshaped_img = numpy.asarray(img.reshape(length*width, dim), 
+    reshaped_img = numpy.asarray(img.reshape(length*width, dim),
                                  dtype=theano.config.floatX)
     pca = PCA(n_components=n_principle)
     pca_img = pca.fit_transform(reshaped_img)
-    
+
     # Regularization: Think about energy of each principles here.
     reg_img = scale_to_unit_interval(ndar=pca_img, eps=1e-8)
-    reg_img = numpy.asarray(reg_img.reshape(length, width, n_principle), 
+    reg_img = numpy.asarray(reg_img.reshape(length, width, n_principle),
                             dtype=theano.config.floatX)
     energy_dist = pca.explained_variance_ratio_
     residual = 1 - numpy.sum(energy_dist[0: n_principle])
     return reg_img, energy_dist, residual
 
 
-def T_pca_constructor(hsi_img=None, gnd_img=None, n_principle=3, window_size=1, 
+def T_pca_constructor(hsi_img=None, gnd_img=None, n_principle=3, window_size=1,
                       flag='supervised', merge=False):
     """
-    This function constructs the spectral and spatial facade for each training 
-    pixel. 
-    
+    This function constructs the spectral and spatial facade for each training
+    pixel.
+
     Spectral data returned are simply spectra.
-    
+
     spatial data returned are the former n_principle PCs of a neibor region
-    around each extracted pixel. Size of the neibor region is determined by 
-    window_size. And all the values for a pixel are flattened to 1-D size. So 
+    around each extracted pixel. Size of the neibor region is determined by
+    window_size. And all the values for a pixel are flattened to 1-D size. So
     data_spatial is finally a 2-D numpy.array.
-    
+
     All the returned data are regularized to [0, 1]. Set window_size=1 to
     get pure spectral returnings.
 
     Parameters:
-    hsi_img=None:       3-D numpy.ndarray, dtype=float, storing initial 
+    hsi_img=None:       3-D numpy.ndarray, dtype=float, storing initial
                         hyperspectral image data.
     gnd_img=None:       2-D numpy.ndarray, dtype=int, containing tags for pixeles.
-                        The size is the same to the hsi_img size, but with only 
+                        The size is the same to the hsi_img size, but with only
                         1 band.
-    n_principle:        Target number of principles we want to consider in the 
+    n_principle:        Target number of principles we want to consider in the
                         spatial infomation.
-    window_size:        Determins the scale of spatial information incorporated. 
+    window_size:        Determins the scale of spatial information incorporated.
                         Must be odd.
     flag:               For 'unsupervised', all possible pixels except marginals
-                        are processed. For 'supervised', only pixels with 
+                        are processed. For 'supervised', only pixels with
                         non-zero tags are processed.
-    
+
     Return:
-    data_spectral:      2-D numpy.array, sized (sample number) * (band number). 
+    data_spectral:      2-D numpy.array, sized (sample number) * (band number).
                         Consists of regularized spectra for all extracted pixels.
     data_spatial:       2-D numpy.array, sized (sample number) * (window_size^2).
                         Consists the former n_principle PCs of a neibor region
                         around each extracted pixel. Size of the neibor region
                         is determined by window_size.
-    gndtruth:           1-D numpy.array, sized (sample number) * 1. Truth value 
-                        for each extracted pixel. 
-    extracted_pixel_ind:2-D numpy.array, sized (length) * (width). Indicating 
+    gndtruth:           1-D numpy.array, sized (sample number) * 1. Truth value
+                        for each extracted pixel.
+    extracted_pixel_ind:2-D numpy.array, sized (length) * (width). Indicating
                         which pixels are selected.
     """
     # PCA transformation
@@ -347,24 +350,24 @@ def T_pca_constructor(hsi_img=None, gnd_img=None, n_principle=3, window_size=1,
     dim = hsi_img.shape[2]
 
     # reshape img, HORIZONTALLY strench the img, without changing the spectral dim.
-    reshaped_img = numpy.asarray(hsi_img.reshape(length*width, dim), 
+    reshaped_img = numpy.asarray(hsi_img.reshape(length*width, dim),
                                  dtype=theano.config.floatX)
-    reshaped_gnd = gnd_img.reshape(gnd_img.size) 
-    
+    reshaped_gnd = gnd_img.reshape(gnd_img.size)
+
     # mask ensures marginal pixels eliminated, according to window_size
     threshold = (window_size-1) / 2
     if window_size >= 1 and window_size < width-1 and window_size < length-1:
         mask_false = numpy.array([False, ] * width)
         mask_true = numpy.hstack((numpy.array([False, ] * threshold, dtype='bool'),
-                                  numpy.array([True, ] * (width-2*threshold)), 
+                                  numpy.array([True, ] * (width-2*threshold)),
                                   numpy.array([False, ] * threshold, dtype='bool')))
-        mask = numpy.vstack((numpy.tile(mask_false, [threshold, 1]), 
-                             numpy.tile(mask_true, [length-2*threshold, 1]), 
+        mask = numpy.vstack((numpy.tile(mask_false, [threshold, 1]),
+                             numpy.tile(mask_true, [length-2*threshold, 1]),
                              numpy.tile(mask_false, [threshold, 1])))
         reshaped_mask = mask.reshape(mask.size)
     else:
         print >> sys.stderr, ('window_size error. choose 0 < window_size < width-1')
-        
+
     # construct groundtruth, and determine which pixel to process
     if flag == 'supervised':
         extracted_pixel_ind = (reshaped_gnd > 0) * reshaped_mask
@@ -377,7 +380,7 @@ def T_pca_constructor(hsi_img=None, gnd_img=None, n_principle=3, window_size=1,
         print >> sys.stderr, ('\"flag\" parameter error. ' +
                               'What type of learning you are doing?')
         return
-    
+
     # construct data_spectral
     data_spectral = reshaped_img[extracted_pixel_ind, :]
 
@@ -385,23 +388,23 @@ def T_pca_constructor(hsi_img=None, gnd_img=None, n_principle=3, window_size=1,
     if window_size == 1:
         data_spatial = numpy.array([])
     else:
-        data_spatial = numpy.zeros([extracted_pixel_ind.size, 
-                                    window_size * window_size * n_principle], 
+        data_spatial = numpy.zeros([extracted_pixel_ind.size,
+                                    window_size * window_size * n_principle],
                                    dtype=theano.config.floatX)
         i = 0
         for ipixel in extracted_pixel_ind:
             ipixel_h = ipixel % width
             ipixel_v = ipixel / width
             data_spatial[i, :] = \
-            pca_img[ipixel_v-threshold : ipixel_v+threshold+1, 
+            pca_img[ipixel_v-threshold : ipixel_v+threshold+1,
                     ipixel_h-threshold : ipixel_h+threshold+1, :].reshape(
                    window_size*window_size*n_principle)
             i += 1
-    
+
     # if we want to merge data, merge it
     if merge:
         data_spectral = numpy.hstack((data_spectral, data_spatial))
-    
+
     return data_spectral, data_spatial, gndtruth, extracted_pixel_ind
 
 
@@ -410,28 +413,28 @@ def train_valid_test(data, ratio=[6, 2, 2], batch_size=50, random_state=None):
     This function splits data into three parts, according to the "ratio" parameter
     given in the lists indicating training, validating, testing data ratios.
     data:             a list containing:
-                      1. A 2-D numpy.array object, with each patterns listed in 
+                      1. A 2-D numpy.array object, with each patterns listed in
                          ROWs. Input data dimension MUST be larger than 1.
-                      2. A 1-D numpy.array object, tags for each pattern. 
-                         '0' indicates that the tag for the corrresponding 
+                      2. A 1-D numpy.array object, tags for each pattern.
+                         '0' indicates that the tag for the corrresponding
                          pattern is unknown.
-    ratio:            A list having 3 elements, indicating ratio of training, 
+    ratio:            A list having 3 elements, indicating ratio of training,
                       validating and testing data ratios respectively.
     batch_size:       bathc_size helps to return an appropriate size of training
-                      samples, which has divisibility over batch_size. 
+                      samples, which has divisibility over batch_size.
                       NOTE: batch_size cannot be larger than the minimal size of
                       all the trainin, validate and test dataset!
     random_state:     If we give the same random state and the same ratio on the
                       same data, the function will yield a same split for each
                       function call.
     return:
-    [train_data_x, train_data_y]: 
+    [train_data_x, train_data_y]:
     [valid_data_x, valid_data_y]:
     [test_data_x , test_data_y ]:
-                      Lists containing 2 numpy.array object, first for data and 
+                      Lists containing 2 numpy.array object, first for data and
                       second for truth. They are for training, validate and test
-                      respectively. All the tags are integers in the range 
-                      [0, data[1].max()-1]. 
+                      respectively. All the tags are integers in the range
+                      [0, data[1].max()-1].
     split_mask
     """
 
@@ -442,67 +445,67 @@ def train_valid_test(data, ratio=[6, 2, 2], batch_size=50, random_state=None):
     split_mask = numpy.array(['tests', ] * data[0].shape[0])
     split_mask[random_mask <= ratio[0]] = 'train'
     split_mask[(random_mask <= ratio[1]+ratio[0]) * (random_mask > ratio[0])] = 'valid'
-    
+
     train_data_x = data[0][split_mask == 'train', :]
     train_data_y = data[1][split_mask == 'train']-1
     valid_data_x = data[0][split_mask == 'valid', :]
     valid_data_y = data[1][split_mask == 'valid']-1
     test_data_x  = data[0][split_mask == 'tests', :]
     test_data_y  = data[1][split_mask == 'tests']-1
-    
+
     # tackle the batch size mismatch problem
     mis_match = train_data_x.shape[0] % batch_size
     if mis_match != 0:
         mis_match = batch_size - mis_match
         train_data_x = numpy.vstack((train_data_x, train_data_x[0:mis_match, :]))
         train_data_y = numpy.hstack((train_data_y, train_data_y[0:mis_match]))
-    
+
     mis_match = valid_data_x.shape[0] % batch_size
     if mis_match != 0:
         mis_match = batch_size - mis_match
         valid_data_x = numpy.vstack((valid_data_x, valid_data_x[0:mis_match, :]))
         valid_data_y = numpy.hstack((valid_data_y, valid_data_y[0:mis_match]))
-    
+
     mis_match = test_data_x.shape[0] % batch_size
     if mis_match != 0:
         mis_match = batch_size - mis_match
         test_data_x = numpy.vstack((test_data_x, test_data_x[0:mis_match, :]))
         test_data_y = numpy.hstack((test_data_y, test_data_y[0:mis_match]))
-    
+
     return [train_data_x, train_data_y], \
            [valid_data_x, valid_data_y], \
            [test_data_x , test_data_y], split_mask
 
 
-def prepare_data(hsi_img=None, gnd_img=None, window_size=7, n_principle=3, 
+def prepare_data(hsi_img=None, gnd_img=None, window_size=7, n_principle=3,
                  batch_size=50, merge=False, ratio=[6, 2, 2]):
     """
-    Process the data from file path to splited train-valid-test sets; Binded in 
+    Process the data from file path to splited train-valid-test sets; Binded in
     dataset_spectral and dataset_spatial respectively.
-    
+
     Parameters
     ----------
-    
-    hsi_img=None:       3-D numpy.ndarray, dtype=float, storing initial 
+
+    hsi_img=None:       3-D numpy.ndarray, dtype=float, storing initial
                         hyperspectral image data.
     gnd_img=None:       2-D numpy.ndarray, dtype=int, containing tags for pixeles.
-                        The size is the same to the hsi_img size, but with only 
+                        The size is the same to the hsi_img size, but with only
                         1 band.
-    window_size:        Size of spatial window. Pass an integer 1 if no spatial 
+    window_size:        Size of spatial window. Pass an integer 1 if no spatial
                         infomation needed.
-    n_principle:        This many principles you want to incorporate while 
+    n_principle:        This many principles you want to incorporate while
                         extracting spatial info.
-    merge:              If merge==True, the returned dataset_spectral has 
-                        dataset_spatial stacked in the tail of it; else if 
-                        merge==False, the returned dataset_spectral and 
+    merge:              If merge==True, the returned dataset_spectral has
+                        dataset_spatial stacked in the tail of it; else if
+                        merge==False, the returned dataset_spectral and
                         dataset_spatial will have spectral and spatial information
                         only, respectively.
-    
+
     Return
     ------
-    
-    dataset_spectral:   
-    dataset_spatial:    
+
+    dataset_spectral:
+    dataset_spatial:
     extracted_pixel_ind:
     split_mask:
     """
@@ -510,7 +513,7 @@ def prepare_data(hsi_img=None, gnd_img=None, window_size=7, n_principle=3,
     data_spectral, data_spatial, gndtruth, extracted_pixel_ind = \
         T_pca_constructor(hsi_img=hsi_img, gnd_img=gnd_img, n_principle=n_principle,
                           window_size=window_size, flag='supervised')
-    
+
     ################ separate train, valid and test spatial data ###############
     [train_spatial_x, train_y], [valid_spatial_x, valid_y], [test_spatial_x, test_y], split_mask = \
         train_valid_test(data=[data_spatial, gndtruth], ratio=ratio,
@@ -523,20 +526,20 @@ def prepare_data(hsi_img=None, gnd_img=None, window_size=7, n_principle=3,
     train_set_y = theano.shared(value=train_y, name='train_set_y', borrow=True)
     valid_set_y = theano.shared(value=valid_y, name='valid_set_y', borrow=True)
     test_set_y  = theano.shared(value=test_y,  name='test_set_y',  borrow=True)
-    dataset_spatial = [(train_set_x, train_set_y), (valid_set_x, valid_set_y), 
+    dataset_spatial = [(train_set_x, train_set_y), (valid_set_x, valid_set_y),
                        (test_set_x, test_set_y)]
 
     ############### separate train, valid and test spectral data ###############
     [train_spectral_x, train_y], [valid_spectral_x, valid_y], [test_spectral_x, test_y], split_mask = \
         train_valid_test(data=[data_spectral, gndtruth], ratio=ratio,
                          batch_size=batch_size, random_state=123)
-    
+
     # if we want to merge data, merge it
     if merge:
         train_spectral_x = numpy.hstack((train_spectral_x, train_spatial_x))
         valid_spectral_x = numpy.hstack((valid_spectral_x, valid_spatial_x))
         test_spectral_x  = numpy.hstack((test_spectral_x,  test_spatial_x))
-    
+
     # convert them to theano.shared values
     train_set_x = theano.shared(value=train_spectral_x, name='train_set_x', borrow=True)
     valid_set_x = theano.shared(value=valid_spectral_x, name='valid_set_x', borrow=True)
@@ -544,9 +547,9 @@ def prepare_data(hsi_img=None, gnd_img=None, window_size=7, n_principle=3,
     train_set_y = theano.shared(value=train_y, name='train_set_y', borrow=True)
     valid_set_y = theano.shared(value=valid_y, name='valid_set_y', borrow=True)
     test_set_y  = theano.shared(value=test_y,  name='test_set_y',  borrow=True)
-    dataset_spectral = [(train_set_x, train_set_y), (valid_set_x, valid_set_y), 
+    dataset_spectral = [(train_set_x, train_set_y), (valid_set_x, valid_set_y),
                         (test_set_x, test_set_y)]
-    
+
     return dataset_spectral, dataset_spatial, extracted_pixel_ind, split_mask
 
 
@@ -555,7 +558,7 @@ if __name__ == '__main__':
     print '... Testing function result_analysis'
     import random
     from sklearn import svm, datasets
-    
+
     # import some data to play with
     print '... loading Iris data'
     iris = datasets.load_iris()
@@ -574,12 +577,12 @@ if __name__ == '__main__':
     y_ = classifier.fit(X[:half], y[:half]).predict(X[half:])
 
     result_analysis(y_, y[:half], numpy.asarray([]), y[half:])
-    
+
     # load .mat files
     print '... loading KSC data'
     hsi_file = u'/home/hantek/data/hsi_data/kennedy/Kennedy_denoise.mat'
     gnd_file = u'/home/hantek/data/hsi_data/kennedy/Kennedy_groundtruth.mat'
-    
+
     data = sio.loadmat(hsi_file)
     img = numpy.float_(data['Kennedy176'])
 
@@ -598,7 +601,7 @@ if __name__ == '__main__':
         spectral_valid_y = dataset_spectral[1][1].get_value()
         spectral_test_x  = dataset_spectral[2][0].get_value()
         spectral_test_y  = dataset_spectral[2][1].get_value()
-                                 
+
         spatial_train_x  = dataset_spatial[0][0].get_value()
         spatial_train_y  = dataset_spatial[0][1].get_value()
         spatial_valid_x  = dataset_spatial[1][0].get_value()
@@ -606,36 +609,36 @@ if __name__ == '__main__':
         spatial_test_x   = dataset_spatial[2][0].get_value()
         spatial_test_y   = dataset_spatial[2][1].get_value()
 
-        print 'shape of:' 
-        print 'spectral_train_x: \t', 
-        print spectral_train_x.shape, 
-        print 'spectral_train_y: \t', 
+        print 'shape of:'
+        print 'spectral_train_x: \t',
+        print spectral_train_x.shape,
+        print 'spectral_train_y: \t',
         print spectral_train_y.shape
-        print 'spectral_valid_x: \t', 
+        print 'spectral_valid_x: \t',
         print spectral_valid_x.shape,
-        print 'spectral_valid_y: \t', 
+        print 'spectral_valid_y: \t',
         print spectral_valid_y.shape
-        print 'spectral_test_x: \t', 
+        print 'spectral_test_x: \t',
         print spectral_test_x.shape,
-        print 'spectral_test_y: \t', 
+        print 'spectral_test_y: \t',
         print spectral_test_y.shape
-        
-        print 'spatial_train_x: \t', 
+
+        print 'spatial_train_x: \t',
         print spatial_train_x.shape,
-        print 'spatial_train_y: \t', 
+        print 'spatial_train_y: \t',
         print spatial_train_y.shape
-        print 'spatial_valid_x: \t', 
-        print spatial_valid_x.shape, 
-        print 'spatial_valid_y: \t', 
+        print 'spatial_valid_x: \t',
+        print spatial_valid_x.shape,
+        print 'spatial_valid_y: \t',
         print spatial_valid_y.shape
-        print 'spatial_test_x: \t', 
-        print spatial_test_x.shape, 
-        print 'spatial_test_y: \t', 
+        print 'spatial_test_x: \t',
+        print spatial_test_x.shape,
+        print 'spatial_test_y: \t',
         print spatial_test_y.shape
-        
+
         print 'total tagged pixel number: %d' % extracted_pixel_ind.shape[0]
         print 'split_mask shape: %d' % split_mask.shape
-        
+
         print '... checking tags in spatial and spectral data'
         trainset_err = numpy.sum((spectral_train_y-spatial_train_y) ** 2)
         validset_err = numpy.sum((spectral_valid_y-spatial_valid_y) ** 2)
@@ -661,9 +664,9 @@ if __name__ == '__main__':
             'spatial_valid_y':  dataset_spatial[1][1].get_value(),
             'spatial_test_x':   dataset_spatial[2][0].get_value(),
             'spatial_test_y':   dataset_spatial[2][1].get_value(),
-              
+
             'extracted_pixel_ind': extracted_pixel_ind,
             'split_mask':       split_mask})
 
-        
+
     print 'Done.'

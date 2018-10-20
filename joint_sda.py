@@ -316,5 +316,5 @@ if __name__ == '__main__':
                                pretraining_epochs=args.pretraining_epochs, pretrain_lr=0.5,
                                training_epochs=args.training_epochs,  finetune_lr=0.05,
                                hidden_layers_sizes=args.layers,
-                               corruption_levels = [0., 0.])
+                               corruption_levels = [0.]*len(args.layers))
 
