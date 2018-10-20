@@ -286,7 +286,7 @@ def parse_args():
     parser.add_argument('--batch_size', default=100, type=int)
     parser.add_argument('--pretraining_epochs', default=500, type=int)
     parser.add_argument('--training_epochs', default=100000, type=int)
-    parser.add_argument('--layers', nargs='+', default="280 100", required=True)
+    parser.add_argument('--layers', nargs='+', default="280 100")
     return parser.parse_args()
 
 if __name__ == '__main__':
