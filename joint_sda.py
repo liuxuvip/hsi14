@@ -290,6 +290,7 @@ def run_sda(datasets=None, batch_size=100,
 
 if __name__ == '__main__':
     args = parse_args()
+    print(args)
     if type(args.layers) == str:
         args.layers = list(map(int, args.layers.split()))
     elif type(args.layers) == list:
