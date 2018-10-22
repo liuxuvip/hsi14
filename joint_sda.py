@@ -2,9 +2,7 @@ __author__ = "Zhouhan LIN"
 __date__ = "June 2013"
 __version__ = "1.0"
 
-import argparse
 import os
-import sys
 import time
 import pdb
 import scipy.io as sio
@@ -16,32 +14,41 @@ from scipy.stats import t
 from sklearn import svm
 from sklearn.metrics import confusion_matrix
 from theano.tensor.shared_randomstreams import RandomStreams
+import sys
 
 from SdA import SdA
 from hsi_utils import *
 
-
 cmap = numpy.asarray( [[0, 0, 0],
-                       [95, 205, 50],
+                       [192, 192, 192],
+                       [0, 255, 0],
+                       [0, 255, 255],
+                       [0, 128, 0],
                        [255, 0, 255],
-                       [215, 115, 0],
-                       [180, 30, 0],
-                       [0, 50, 0],
-                       [75, 0, 0],
-                       [255, 255, 255],
-                       [145, 130, 135],
-                       [255, 255, 170],
-                       [255, 200, 80],
-                       [60, 200, 255],
-                       [10, 65, 125],
-                       [0, 0, 255]], dtype='int32')
+                       [165, 82, 41],
+                       [128, 0, 128],
+                       [255, 0, 0],
+                       [255, 255, 0]], dtype='int32')
 
+import argparse
+def parse_args():
+    parser = argparse.ArgumentParser(description="Code paper 14.")
+    parser.add_argument('--hsi', default="../data 1/PaviaU/PaviaU.mat")
+    parser.add_argument('--gt', default="../data 1/PaviaU/PaviaU_gt.mat")
+    parser.add_argument('--key_hsi', default="paviaU")
+    parser.add_argument('--key_gt', default="paviaU_gt")
+    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--pretraining_epochs', default=500, type=int)
+    parser.add_argument('--training_epochs', default=80000, type=int)
+    parser.add_argument('--layers', nargs='+', default="280 100 100 100", type=str)
+    parser.add_argument('--print_every', default=1000, type=int)
+    return parser.parse_args()
 
 def run_sda(datasets=None, batch_size=100,
-            window_size=7, n_principle=4,
+            window_size=7, n_principle=3,
             pretraining_epochs=2000, pretrain_lr=0.02,
             training_epochs=10000,  finetune_lr=0.008,
-            hidden_layers_sizes=[310, 100], corruption_levels = [0., 0.], print_every=100):
+            hidden_layers_sizes=[310, 100], corruption_levels = [0., 0.]):
     """
     This function maps spatial PCs to a deep representation.
 
@@ -133,12 +140,11 @@ def run_sda(datasets=None, batch_size=100,
                             # found
     improvement_threshold = 0.995  # a relative improvement of this much is
                                    # considered significant
-    # validation_frequency = min(10 * n_train_batches, patience / 2)
+    validation_frequency = min(10 * n_train_batches, patience / 2)
                             # go through this many
                             # minibatche before checking the network
                             # on the validation set; in this case we
                             # check every epoch
-    validation_frequency = print_every
 
     best_params = None
     best_validation_loss = numpy.inf
@@ -189,9 +195,12 @@ def run_sda(datasets=None, batch_size=100,
                           ' ran for %.2fm' % ((end_time - start_time) / 60.))
 
     # keep the following line consistent with line 227, function "prepare_data"
-    filename = 'ksc_l1sda_pt%d_ft%d_lrp%.4f_f%.4f_bs%d_pca%d_ws%d' % \
+    filename = 'pavia_l1sda_pt%d_ft%d_lrp%.4f_f%.4f_bs%d_pca%d_ws%d' % \
                 (pretraining_epochs, training_epochs, pretrain_lr, finetune_lr,
                  batch_size, n_principle, window_size)
+
+    print '... saving parameters'
+    sda.save_params(filename + '_params.pkl')
 
     print '... classifying test set with learnt model:'
     pred_func = theano.function(inputs=[sda.x], outputs=sda.logLayer.y_pred)
@@ -234,19 +243,15 @@ def run_sda(datasets=None, batch_size=100,
                           datasets[2][0].get_value())),
             numpy.hstack((datasets[1][1].get_value(),
                           datasets[2][1].get_value()))]
-    # numpy_rng = numpy.random.RandomState(89677)
-    numpy.random.seed(89677)
+    numpy_rng = numpy.random.RandomState(89677)
     num_test = 100
     print 'Total number of tests: %d' % num_test
     k_sae = []
     k_svm = []
     for i in xrange(num_test):
-        # [_, _], [_, _], [test_x, test_y], _ = \
-        # train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
-        #                  random_state=numpy_rng.random_integers(1e10))
         [_, _], [_, _], [test_x, test_y], _ = \
         train_valid_test(data, ratio=[0, 1, 1], batch_size=1,
-                         random_state=numpy.random.randint(0,2e31, dtype=numpy.int64))
+                         random_state=numpy_rng.random_integers(1e10))
         test_y = test_y + 1 # fix the label scale problem
         pred_y = pred_func(test_x)
         cm = confusion_matrix(test_y, pred_y)
@@ -280,20 +285,8 @@ def run_sda(datasets=None, batch_size=100,
     else:
         print 'left = %f, right = %f, test FAILED.' % (left, right)
 
-    return test_score
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Code paper 14.")
-    parser.add_argument('--hsi', default="../data 1/KSC/KSC.mat")
-    parser.add_argument('--gt', default="../data 1/KSC/KSC_gt.mat")
-    parser.add_argument('--key_hsi', default="KSC")
-    parser.add_argument('--key_gt', default="KSC_gt")
-    parser.add_argument('--batch_size', default=100, type=int)
-    parser.add_argument('--pretraining_epochs', default=500, type=int)
-    parser.add_argument('--training_epochs', default=100000, type=int)
-    parser.add_argument('--layers', nargs='+', default="280 100", type=str)
-    parser.add_argument('--print_every', default=1000, type=int)
-    return parser.parse_args()
+    return test_score
 
 if __name__ == '__main__':
     args = parse_args()
@@ -301,6 +294,7 @@ if __name__ == '__main__':
         args.layers = list(map(int, args.layers.split()))
     elif type(args.layers) == list:
         args.layers = list(map(int, args.layers))
+
     hsi_file = args.hsi
     gnd_file = args.gt
 
@@ -311,20 +305,18 @@ if __name__ == '__main__':
     height = img.shape[1]
     bands = img.shape[2]
     data = sio.loadmat(gnd_file)
-    gnd_img = data[args.key_gt]
-    gnd_img = gnd_img.astype(numpy.int32)
+    gnd_img = data[args.key_gt].astype(numpy.int32)
 
     print '... extracting train-valid-test sets'
     datasets, _, _, _ = \
         prepare_data(hsi_img=img, gnd_img=gnd_img, merge=True,
-                     window_size=7, n_principle=3, batch_size=args.batch_size)
+                     window_size=7, n_principle=4, batch_size=args.batch_size, ratio=[3,1,6])
 
     print '... Running hybrid feature extraction on SdA'
     spatial_accuracy = run_sda(datasets=datasets, batch_size=args.batch_size,
-                               window_size=7, n_principle=3,
+                               window_size=7, n_principle=4,
                                pretraining_epochs=args.pretraining_epochs, pretrain_lr=0.5,
-                               training_epochs=args.training_epochs,  finetune_lr=0.05,
+                               training_epochs=args.training_epochs,  finetune_lr=0.03,
                                hidden_layers_sizes=args.layers,
-                               corruption_levels = [0.]*len(args.layers),
-                               print_every=args.print_every)
+                               corruption_levels = [0.]*len(args.layers))
 
